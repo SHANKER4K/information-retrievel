@@ -1,0 +1,6 @@
+{
+  "model": "tfidf",
+  "method": "cosine",
+  "k": 10,
+  "max_query_words": 20
+}
