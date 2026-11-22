@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 import streamlit as st
 
 import data_loader
@@ -19,6 +20,19 @@ STEPS = [
 ]
 DEFAULT_STEPS = ("tag_cleaning", "normalization", "stopwords_removal", "stemming")
 DEFAULT_CONFIG = {"model": "tfidf", "method": "cosine", "k": 10, "max_query_words": 20}
+
+MODEL_TABS = {
+    "bow": "BoW",
+    "frequency": "Frequency",
+    "tf": "TF",
+    "tfidf": "TF-IDF",
+}
+MODEL_FORMULAS = {
+    "bow": "1 if term present in document, else 0",
+    "frequency": "raw count of term in document",
+    "tf": "tf = f(t,d) / max_w f(w,d)",
+    "tfidf": "tf = f(t,d) / max_w f(w,d), idf = log(N / df(t)), weight = tf * idf",
+}
 
 
 def render_admin():
@@ -138,10 +152,77 @@ def render_search():
             st.write(hit["text"][:600])
 
 
-role = st.sidebar.radio("Interface", ["Admin", "Search"])
+def _model_frame(result, model, max_docs, max_terms):
+    term_document = result["models"][model]["term_document"]
+    frame = pd.DataFrame(term_document[:max_docs], index=[
+        doc["id"] for doc in result["documents"][:max_docs]
+    ])
+    frame = frame.reindex(columns=result["vocabulary"], fill_value=0.0).fillna(0.0)
+    top_terms = frame.sum(axis=0).sort_values(ascending=False).index[:max_terms]
+    return frame[list(top_terms)]
+
+
+def render_visualize():
+    st.title("Visualize Weight Matrices")
+
+    folder = st.text_input("Index folder", st.session_state.get("run_dir", "indexes/run1"), key="viz_folder")
+    if st.button("Load index", key="viz_load"):
+        try:
+            st.session_state["viz_index"] = serialization.load(folder)
+            st.session_state["run_dir"] = folder
+            st.success(f"Loaded index from {folder}")
+        except (FileNotFoundError, ValueError) as error:
+            st.error(f"Could not load index: {error}")
+
+    result = st.session_state.get("viz_index") or st.session_state.get("result")
+    if not result:
+        st.info("Generate indexes in Admin or load a saved index folder.")
+        return
+
+    meta = result["metadata"]
+    pipeline = " -> ".join(meta["pipeline"]) or "none"
+    st.caption(
+        f"{meta['document_count']} documents | {meta['vocabulary_size']} terms | pipeline: {pipeline}"
+    )
+
+    col_terms, col_docs = st.columns(2)
+    max_terms = col_terms.slider("Terms shown (highest total weight)", 5, 50, 20)
+    documents = meta["document_count"]
+    max_docs = col_docs.slider(
+        "Documents shown", 1, max(1, min(documents, 50)), min(documents, 10) or 1
+    )
+
+    tabs = st.tabs([MODEL_TABS[model] for model in search_engine.MODELS])
+    for tab, model in zip(tabs, search_engine.MODELS):
+        with tab:
+            frame = _model_frame(result, model, max_docs, max_terms)
+            non_zero = int((frame.to_numpy() != 0).sum())
+            cells = frame.size
+            sparsity = 100 * (1 - non_zero / cells) if cells else 0.0
+            st.caption(f"Weight: {MODEL_FORMULAS[model]}")
+
+            col_a, col_b, col_c = st.columns(3)
+            col_a.metric("Non-zero cells", non_zero)
+            col_b.metric("Sparsity", f"{sparsity:.1f}%")
+            col_c.metric("Max weight", f"{frame.to_numpy().max():.4f}" if cells else "0")
+
+            number_format = "%.0f" if model in ("bow", "frequency") else "%.3f"
+            st.dataframe(
+                frame,
+                width="stretch",
+                column_config={
+                    term: st.column_config.NumberColumn(term, format=number_format)
+                    for term in frame.columns
+                },
+            )
+
+
+role = st.sidebar.radio("Interface", ["Admin", "Search", "Visualize"])
 st.sidebar.caption("Phase 1: Admin indexing. Phase 2: Guest search.")
 
 if role == "Admin":
     render_admin()
-else:
+elif role == "Search":
     render_search()
+else:
+    render_visualize()

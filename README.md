@@ -56,6 +56,6 @@ tests/
 ## Notes
 
 - Weighting formulas follow the assignment exactly: `TF = f(t,d) / max_w f(w,d)`, `IDF = log(N / df(t))`, `TF-IDF = TF × IDF`.
-- Matrices are **sparse** dict-of-dicts; zeros are never stored.
+- Matrices are **sparse** dict-of-dicts; absent cells are never stored (TF-IDF terms with `df = N` keep an explicit `0.0`).
 - Matrix orientation follows the raw French wording: `document_term` = rows terms × cols docs, `term_document` = rows docs × cols terms.
 - `sklearn` is intentionally not used for TF-IDF because its defaults (smooth IDF, L2 normalization) do not match the required formulas.

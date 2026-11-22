@@ -1,3 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test / lint / type-check caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Generated indexes (rebuild with the Admin page)
+indexes/
+
+# Dataset downloads and Hugging Face cache
+data/
+*.tar.gz
+.cache/
+huggingface/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Local configuration and secrets
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Agent tooling
 .agents
 .claude
-.venv
+.commandcode

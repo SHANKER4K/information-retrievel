@@ -1,41 +1,25 @@
 import os
+import re
+
+_ATTR_RE = re.compile(r"""(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""")
+_DOC_RE = re.compile(r"<REUTERS\b[^>]*>.*?</REUTERS>", re.DOTALL)
 
 
 def _field(block, tag):
-    start = block.find(f"<{tag}>")
-    if start == -1:
-        return ""
-    content_start = block.find(">", start) + 1
-    end = block.find(f"</{tag}>", content_start)
-    if end == -1:
-        return ""
-    return block[content_start:end]
+    match = re.search(rf"<{tag}\b[^>]*>(.*?)</{tag}>", block, re.DOTALL)
+    return match.group(1) if match else ""
 
 
 def _attr(block, name):
-    key = f"{name}="
-    pos = block.find(key)
-    if pos == -1:
-        return ""
-    rest = block[pos + len(key):]
-    if rest[:1] in ('"', "'"):
-        quote = rest[0]
-        return rest[1:rest.find(quote, 1)]
-    end = len(rest)
-    for i, ch in enumerate(rest):
-        if ch in " >":
-            end = i
-            break
-    return rest[:end]
+    for match in _ATTR_RE.finditer(block):
+        if match.group(1) == name:
+            return next((value for value in match.groups()[1:] if value is not None), "")
+    return ""
 
 
 def _extract_docs_from_sgm(text):
     docs = []
-    for chunk in text.split("<REUTERS")[1:]:
-        end = chunk.find("</REUTERS>")
-        if end == -1:
-            continue
-        block = chunk[:end]
+    for block in _DOC_RE.findall(text):
         title = _field(block, "TITLE")
         body = _field(block, "BODY") or _field(block, "TEXT")
         text_content = " ".join(part for part in (title, body) if part).strip()

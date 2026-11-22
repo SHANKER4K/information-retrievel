@@ -1,4 +1,10 @@
+import re
+
 import nltk
+
+_TAG_RE = re.compile(r"<[^>]*(?:>|\Z)")
+_NUMERIC_ENTITY_RE = re.compile(r"&#(\d+);")
+_NON_ALNUM_RE = re.compile(r"[\W_]+")
 
 _STOPWORDS = None
 _STEMMER = None
@@ -26,44 +32,24 @@ def _ensure():
 
 
 def _decode_numeric_entities(text):
-    out = []
-    i = 0
-    while i < len(text):
-        if text.startswith("&#", i):
-            semi = text.find(";", i + 2)
-            if semi != -1:
-                digits = text[i + 2:semi]
-                if digits.isdigit():
-                    try:
-                        out.append(chr(int(digits)))
-                        i = semi + 1
-                        continue
-                    except (ValueError, OverflowError):
-                        pass
-        out.append(text[i])
-        i += 1
-    return "".join(out)
+    def replace(match):
+        try:
+            return chr(int(match.group(1)))
+        except (ValueError, OverflowError):
+            return match.group(0)
+
+    return _NUMERIC_ENTITY_RE.sub(replace, text)
 
 
 def clean_tags(text):
-    out = []
-    in_tag = False
-    for ch in text:
-        if ch == "<":
-            in_tag = True
-        elif ch == ">":
-            in_tag = False
-        elif not in_tag:
-            out.append(ch)
-    result = _decode_numeric_entities("".join(out))
+    result = _decode_numeric_entities(_TAG_RE.sub("", text))
     for entity, ch in (("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&apos;", "'")):
         result = result.replace(entity, ch)
     return result
 
 
 def normalize(text):
-    cleaned = "".join(ch if ch.isalnum() else " " for ch in text.lower())
-    return " ".join(cleaned.split())
+    return " ".join(_NON_ALNUM_RE.sub(" ", text.lower()).split())
 
 
 def remove_stopwords(text):
